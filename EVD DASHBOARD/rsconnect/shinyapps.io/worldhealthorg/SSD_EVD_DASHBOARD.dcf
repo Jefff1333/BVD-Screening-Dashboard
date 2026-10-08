@@ -1,0 +1,12 @@
+name: SSD_EVD_DASHBOARD
+title:
+username: worldhealthorg
+account: worldhealthorg
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17435985
+bundleId: 12486920
+url: https://worldhealthorg.shinyapps.io/SSD_EVD_DASHBOARD/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
