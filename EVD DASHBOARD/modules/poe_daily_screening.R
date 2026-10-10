@@ -16,9 +16,12 @@ TALLY_SHEET     <- "Daily entry"
 POE_LIST_SHEET  <- "PoE List"
 HISTORIC_SHEET  <- "wide_data_OLD"
 
+POE_ODK_FORM_PK <- 18951L                  # ODK "PoE Daily Screening Report"
+POE_ODK_START   <- as.Date("2026-09-30")   # first day taken from ODK
 
-# Historic data is used for dates before the new daily poe screening workbook was implemented. Only 4 PoEs were entering data before this date: Nimule, Kaya, River Rei and Olikwi.
-HISTORIC_CUTOFF <- as.Date("2026-09-30")
+
+# Historic data is used for dates before the new daily poe screening workbook was implemented.Only 4 PoEs were entering data before this date: Nimule, Kaya, River Rei and Olikwi.
+HISTORIC_CUTOFF <- POE_ODK_START      # OLD file up to 29th Oct
 
 # Historic column prefixes -> PoE names exactly as in the PoE List
 HISTORIC_POE_MAP <- c(
@@ -79,6 +82,66 @@ chart_download_config <- function(p, name) {
     )
   )
 }
+
+# ---- ODK daily report: fetch (uses the PoE key from .Renviron) ----
+fetch_ona_form <- function(form_pk, token = Sys.getenv("POE_ODK_TOKEN")) {
+  if (!nzchar(token)) { message("POE_ODK_TOKEN not set in .Renviron"); return(tibble()) }
+  recs  <- list(); start <- 0
+  repeat {
+    page <- fetch_ona_page(token, form_pk, start_at = start, limit = ONA_PAGE_SIZE)
+    if (is.null(page) || length(page) == 0) break
+    recs <- c(recs, page)
+    if (length(page) < ONA_PAGE_SIZE) break
+    start <- start + ONA_PAGE_SIZE
+  }
+  if (length(recs) == 0) return(tibble())
+  jsonlite::fromJSON(jsonlite::toJSON(recs, auto_unbox = TRUE, null = "null")) %>%
+    jsonlite::flatten() %>%
+    as_tibble()
+}
+
+# ---- ODK daily report: clean (one row per PoE per day, latest submission wins) ----
+clean_poe_odk <- function(raw) {
+  if (is.null(raw) || nrow(raw) == 0) return(tibble())
+  col <- function(nm) if (nm %in% names(raw)) raw[[nm]] else rep(NA, nrow(raw))
+  num <- function(nm) suppressWarnings(as.numeric(col(nm)))
+  
+  tibble(
+    date       = as.Date(substr(as.character(col("grp_poe/reporting_date")), 1, 10)),
+    poe        = str_squish(as.character(coalesce(col("grp_poe/poe_label"), col("grp_poe/poe")))),
+    entry      = num("grp_screening/entry_screened"),
+    exit       = num("grp_screening/exit_screened"),
+    total_calc = num("grp_screening/total_screened"),
+    total_rep  = num("grp_screening/total_screened_reported"),
+    triggered  = num("grp_alerts/alerts_triggered"),
+    discarded  = num("grp_alerts/alerts_discarded"),
+    bodies     = num("grp_alerts/bodies_moved"),
+    submitted  = ymd_hms(col("_submission_time"), quiet = TRUE)
+  ) %>%
+    filter(!is.na(date), !is.na(poe), poe != "", date >= POE_ODK_START) %>%
+    arrange(desc(submitted)) %>%
+    distinct(date, poe, .keep_all = TRUE) %>%
+    arrange(date, poe)
+}
+
+# ---- ODK daily report: match the historic data's columns ----
+odk_to_tally <- function(odk) {
+  if (is.null(odk) || nrow(odk) == 0) return(NULL)
+  odk %>%
+    filter(poe != JIA_POE_NAME) %>%            # JIA comes from its own screening form
+    transmute(
+      date,
+      poe,
+      entry_screened   = entry,
+      exit_screened    = exit,
+      total_typed      = coalesce(total_rep, total_calc),
+      alerts_triggered = triggered,
+      alerts_discarded = discarded,
+      bodies_moved     = bodies,
+      source           = "ODK daily report"
+    )
+}
+
 # ---------- small helpers ----------
 
 # Text cleaning: removes non-breaking spaces and turns blanks into NA
@@ -264,47 +327,19 @@ tally_download_url <- function(url) {
   paste0(url, if (str_detect(url, "\\?")) "&" else "?", "download=1")
 }
 
-# Downloads the latest workbook. Returns the path to use and whether the
-# download worked (FALSE = using the last saved copy).
-fetch_tally_file <- function(url = TALLY_URL, local_copy = TALLY_FILE) {
-  if (!nzchar(trimws(url))) {
-    return(list(path = local_copy, downloaded = FALSE))
-  }
-  
-  tmp <- tempfile(fileext = ".xlsx")
-  
-  ok <- tryCatch({
-    request(tally_download_url(url)) %>%
-      req_timeout(60) %>%
-      req_retry(max_tries = 3) %>%
-      req_perform(path = tmp)
-    
-    # A real .xlsx file starts with "PK". If SharePoint returned a login
-    # page instead (link not shared publicly), this check fails.
-    identical(readBin(tmp, "raw", n = 2), charToRaw("PK"))
-  }, error = function(e) {
-    message("Tally workbook download failed: ", conditionMessage(e))
-    FALSE
-  })
-  
-  if (isTRUE(ok)) {
-    file.copy(tmp, local_copy, overwrite = TRUE)
-    return(list(path = local_copy, downloaded = TRUE))
-  }
-  
-  message("Tally workbook: using last saved copy (", local_copy, ").")
-  list(path = local_copy, downloaded = FALSE)
-}
 
 # ---------- main loader ----------
 
 load_poe_tally <- function(path = TALLY_FILE) {
   tryCatch({
-    poes  <- read_poe_list(path)
-    daily <- read_tally_daily(path)
-    hist  <- read_tally_historic(path)
+    poes <- read_poe_list(path)
+    hist <- read_tally_historic(path) %>% filter(date < POE_ODK_START)   # OLD file, up to 6 Oct
+    odk  <- tryCatch(                                                     # ODK form, from 7 Oct
+      odk_to_tally(clean_poe_odk(fetch_ona_form(POE_ODK_FORM_PK))),
+      error = function(e) { message("ODK PoE fetch failed: ", conditionMessage(e)); NULL }
+    )
     
-    tally <- bind_rows(hist, daily) %>%
+    tally <- bind_rows(hist, odk) %>%
       mutate(
         screening_split    = !is.na(entry_screened) & !is.na(exit_screened),
         total_screened     = if_else(screening_split, entry_screened + exit_screened, total_typed),
@@ -619,7 +654,6 @@ p1_add_jia <- function(d, jia_rows) {
 
 # Download + load in one go (used at refresh)
 p1_reload <- function() {
-  f <- fetch_tally_file()
   d <- load_poe_tally(f$path)
   d$downloaded <- f$downloaded
   d

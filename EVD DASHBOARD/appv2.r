@@ -2126,6 +2126,38 @@ server <- function(input, output, session) {
     }, delay = delay_seconds)
   }
 
+  # Turn raw ODK submissions into one row per PoE per day
+  clean_poe_odk <- function(raw) {
+    if (is.null(raw) || nrow(raw) == 0) return(tibble())
+    col <- function(nm) if (nm %in% names(raw)) raw[[nm]] else rep(NA, nrow(raw))
+    num <- function(nm) suppressWarnings(as.numeric(col(nm)))
+    
+    # second alerts column (discarded) – found by pattern so the exact name doesn't matter
+    disc_nm <- setdiff(grep("^grp_alerts/al", names(raw), value = TRUE), "grp_alerts/alerts_triggered")[1]
+    
+    tibble(
+      date       = as.Date(substr(as.character(col("grp_poe/reporting_date")), 1, 10)),
+      poe        = str_squish(as.character(col("grp_poe/poe"))),
+      entry      = num("grp_screening/entry_screened"),
+      exit       = num("grp_screening/exit_screened"),
+      total_calc = num("grp_screening/total_screened"),
+      total_rep  = num("grp_screening/total_screened_reported"),
+      triggered  = num("grp_alerts/alerts_triggered"),
+      discarded  = if (!is.na(disc_nm)) suppressWarnings(as.numeric(raw[[disc_nm]])) else NA_real_,
+      bodies     = num("grp_alerts/bodies_moved"),
+      notes      = as.character(col("notes")),
+      submitted  = ymd_hms(col("_submission_time"), quiet = TRUE)
+    ) %>%
+      mutate(
+        entry_exit = if_else(is.na(entry) & is.na(exit), NA_real_, coalesce(entry, 0) + coalesce(exit, 0)),
+        total      = coalesce(total_calc, entry_exit, total_rep)
+      ) %>%
+      filter(!is.na(date), !is.na(poe), poe != "", date >= POE_ODK_START) %>%
+      arrange(desc(submitted)) %>%                 # latest submission first…
+      distinct(date, poe, .keep_all = TRUE) %>%    # …so a correction replaces the earlier one
+      arrange(date, poe) %>%
+      select(date, poe, entry, exit, total, triggered, discarded, bodies, notes, submitted)
+  }
  
   
   # Open the dashboard from cache immediately, then refresh Ona after the UI
