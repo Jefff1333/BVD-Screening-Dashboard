@@ -119,7 +119,8 @@ AUTHORIZED_HEALTH_OFFICER_EMAILS <- c(
   "morolawrence@gmail.com",
   "owinog@who.int",
   "wynnea@who.int",
-  "abenegoa@who.int"
+  "abenegoa@who.int",
+  "majakdegoup99@gmail.com"
 )
 
 AUTHORIZED_HEALTH_OFFICER_EMAILS <- tolower(trimws(AUTHORIZED_HEALTH_OFFICER_EMAILS))
