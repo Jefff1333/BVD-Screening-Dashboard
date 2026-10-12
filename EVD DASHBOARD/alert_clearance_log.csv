@@ -1,0 +1,18 @@
+screening_id,cleared_at,cleared_by,clearance_action,case_definition_met,followup_required,clearance_note
+SCR-1BE75AFE,2026-09-30 10:30:39,owinog@who.int,Reviewed - discarded / does not meet EVD alert definition,Unclear,No,
+SCR-00C88938,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+SCR-8F256F89,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260702033646-2d83bba,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260623104114-536fc4b,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260615103141-55e89b8,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260614180353-2fa6fd6,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260614120520-681e0d1,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260609123913-ca6e735,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260603143228-0f54e30,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260602113036-12b072e,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260601144706-a1f0be3,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260601070320-d16fdcd,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260531144703-1761ca8,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260531144647-c3270a9,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260531144946-66b97ab,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
+EVD-20260808223909-63de784,2026-08-29 13:00:49,owinog@who.int,Reviewed - follow-up required,No,No,NA
